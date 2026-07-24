@@ -1,0 +1,17 @@
+{
+  "model": "mobilenetv2_finetuned",
+  "checkpoint_path": "models/mobilenetv2_finetuned_best.h5",
+  "test_accuracy": 0.9586563110351562,
+  "test_loss": 0.11804626137018204,
+  "precision_macro": 0.9572357688721007,
+  "recall_macro": 0.9555555555555555,
+  "f1_macro": 0.9553216114588079,
+  "precision_weighted": 0.9602193198810238,
+  "recall_weighted": 0.958656330749354,
+  "f1_weighted": 0.9584387083337748,
+  "training_time_seconds": 1809.834620900001,
+  "inference_ms_per_image": 7.790578500007541,
+  "fps": 128.36017248257392,
+  "model_size_mb": 21.81786346435547,
+  "params": 2270794
+}

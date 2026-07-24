@@ -1,0 +1,83 @@
+cdfrom __future__ import annotations
+
+from typing import Sequence
+
+
+def _build_classifier(
+    *,
+    backbone_name: str,
+    input_shape: tuple[int, int, int],
+    num_classes: int,
+    dropout_rate: float,
+    base_trainable: bool,
+):
+    import tensorflow as tf
+
+    inputs = tf.keras.Input(shape=input_shape, name="image")
+    x = tf.keras.layers.Rescaling(1.0 / 127.5, offset=-1.0, name="scale_to_mobilenet_range")(inputs)
+
+    if backbone_name == "mobilenetv2":
+        backbone = tf.keras.applications.MobileNetV2(
+            input_shape=input_shape,
+            include_top=False,
+            weights="imagenet",
+        )
+    elif backbone_name == "mobilenetv3small":
+        try:
+            backbone = tf.keras.applications.MobileNetV3Small(
+                input_shape=input_shape,
+                include_top=False,
+                weights="imagenet",
+                include_preprocessing=False,
+            )
+        except TypeError:
+            backbone = tf.keras.applications.MobileNetV3Small(
+                input_shape=input_shape,
+                include_top=False,
+                weights="imagenet",
+            )
+    else:
+        raise ValueError(f"Unsupported backbone: {backbone_name}")
+
+    backbone.trainable = base_trainable
+    x = backbone(x, training=False)
+    x = tf.keras.layers.GlobalAveragePooling2D(name="global_average_pooling")(x)
+    x = tf.keras.layers.Dropout(dropout_rate, name="dropout")(x)
+    outputs = tf.keras.layers.Dense(num_classes, activation="softmax", name="predictions")(x)
+
+    model = tf.keras.Model(inputs=inputs, outputs=outputs, name=backbone_name)
+    return model
+
+
+def build_mobilenetv2(
+    input_shape: Sequence[int] = (224, 224, 3),
+    num_classes: int = 10,
+    dropout_rate: float = 0.2,
+    base_trainable: bool = False,
+):
+    """Build a MobileNetV2 transfer-learning classifier."""
+
+    return _build_classifier(
+        backbone_name="mobilenetv2",
+        input_shape=tuple(input_shape),
+        num_classes=num_classes,
+        dropout_rate=dropout_rate,
+        base_trainable=base_trainable,
+    )
+
+
+def build_mobilenetv3small(
+    input_shape: Sequence[int] = (224, 224, 3),
+    num_classes: int = 10,
+    dropout_rate: float = 0.2,
+    base_trainable: bool = False,
+):
+    """Build a MobileNetV3Small transfer-learning classifier."""
+
+    return _build_classifier(
+        backbone_name="mobilenetv3small",
+        input_shape=tuple(input_shape),
+        num_classes=num_classes,
+        dropout_rate=dropout_rate,
+        base_trainable=base_trainable,
+    )

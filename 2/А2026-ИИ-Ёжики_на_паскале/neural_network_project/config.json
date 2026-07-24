@@ -1,0 +1,43 @@
+{
+  "project": "underwater_black_box_digit_classifier",
+  "task": "10_class_image_classification",
+  "selected_model": null,
+  "dataset_split_dir": "../dataset_split",
+  "original_dataset_dir": "../dataset",
+  "image_min_resolution": [
+    640,
+    480
+  ],
+  "model_input_size": [
+    224,
+    224
+  ],
+  "batch_size": 32,
+  "epochs": {
+    "head_epochs": 20,
+    "finetune_epochs": 12
+  },
+  "optimizer": "Adam",
+  "learning_rate": {
+    "head": 0.0001,
+    "fine_tuning": 0.00001
+  },
+  "class_names": [
+    "digit_1",
+    "digit_2",
+    "digit_3",
+    "digit_4",
+    "digit_5",
+    "digit_6",
+    "digit_7",
+    "digit_8",
+    "digit_9",
+    "no_object"
+  ],
+  "models": [
+    "mobilenetv2_finetuned",
+    "mobilenetv3small"
+  ],
+  "target_platform": "Raspberry Pi 4 4GB",
+  "metrics_summary": {}
+}
