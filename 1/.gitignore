@@ -1,0 +1,7 @@
+aruco/
+dataset/
+recordings/
+dataset_split/
+dataset.zip
+__pycache__/
+*.pyc

@@ -1,0 +1,21 @@
+{
+  "settings_version": "0.0.6",
+  "datasets_dir": "C:\\Users\\sl1m\\Desktop\\arh26\\1\\datasets",
+  "weights_dir": "weights",
+  "runs_dir": "runs",
+  "uuid": "b2eb15d451b95eef9b42fffcd52d4060b0dba1533001357d256e7c2390e3d7e2",
+  "sync": true,
+  "api_key": "",
+  "openai_api_key": "",
+  "clearml": true,
+  "comet": true,
+  "dvc": true,
+  "hub": true,
+  "mlflow": true,
+  "neptune": true,
+  "raytune": true,
+  "tensorboard": false,
+  "wandb": false,
+  "vscode_msg": true,
+  "openvino_msg": true
+}
