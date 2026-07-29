@@ -3,3 +3,4 @@ dataset_split/
 dataset.zip
 __pycache__/
 *.pyc
+2_track/final/recordings/
