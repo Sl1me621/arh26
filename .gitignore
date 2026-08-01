@@ -4,3 +4,14 @@ dataset.zip
 __pycache__/
 *.pyc
 2_track/final/recordings/
+
+# Local Python environment
+/3_track/.venv/
+
+# Local photo and video data
+/recordings/
+/3_track/calibration_dataset/
+/3_track/dop_dataset/
+/3_track/test_dataset/
+/3_track/2.mp4
+/3_track/image.jpg
