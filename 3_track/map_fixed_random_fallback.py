@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import random
 import threading
 import time
 from pathlib import Path
@@ -34,6 +35,13 @@ WINDOW_HEIGHT = 720
 
 POSE_PATH_MIN_STEP_M = 0.03
 MAX_POSE_PATH_POINTS = 5000
+MAX_STATIONS = 4
+
+# Если рассчитанная координата станции выходит за поле,
+# станция всё равно рисуется в стабильной случайной точке внутри карты.
+RANDOM_FALLBACK_MARGIN_M = 0.45
+RANDOM_FALLBACK_MIN_DISTANCE_M = 0.80
+RANDOM_FALLBACK_SEED = 20260802
 
 
 # ============================================================
@@ -75,6 +83,11 @@ map_needs_update.set()
 
 detected_stations: dict[int, dict] = {}
 
+# Случайная запасная позиция сохраняется за ID станции,
+# поэтому точка не прыгает при каждом HTTP-обновлении.
+fallback_positions_lock = threading.Lock()
+fallback_station_positions: dict[int, tuple[float, float]] = {}
+
 current_pose: dict = {
     "x": 0.0,
     "y": 0.0,
@@ -85,7 +98,7 @@ current_pose: dict = {
     "flow_v": 0.0,
     "rotation_deg": 0.0,
     "total_distance": 0.0,
-    "coordinate_mode": "visual_odometry",
+    "coordinate_mode": "waypoint",
     "received_at": 0.0,
 }
 
@@ -104,21 +117,21 @@ def drone_to_map_coordinates(
     """
     Локальная система дрона:
         +X направлен вниз по карте;
-        +Y направлен вправо по карте.
+        +Y направлен влево по карте.
 
-    Поэтому при движении влево локальная Y уменьшается.
+    При возвращении вправо локальная Y уменьшается.
 
     Система карты:
         map X растёт справа налево;
         map Y растёт сверху вниз.
 
     Поэтому:
-        map_x = 1.5 - local_y
+        map_x = 1.5 + local_y
         map_y = 4.5 + local_x
     """
 
     return (
-        DRONE_START_MAP_X - y_drone,
+        DRONE_START_MAP_X + y_drone,
         DRONE_START_MAP_Y + x_drone,
     )
 
@@ -151,6 +164,62 @@ def point_inside_field(x_map: float, y_map: float) -> bool:
         0.0 <= x_map <= FIELD_WIDTH_M
         and 0.0 <= y_map <= FIELD_HEIGHT_M
     )
+
+
+def get_fallback_map_position(
+    station_id: int,
+) -> tuple[float, float]:
+    """
+    Возвращает стабильную случайную точку внутри поля.
+
+    Для одного и того же ID позиция сохраняется и не меняется
+    при последующих обновлениях станции.
+    """
+
+    with fallback_positions_lock:
+        existing = fallback_station_positions.get(station_id)
+
+        if existing is not None:
+            return existing
+
+        rng = random.Random(
+            RANDOM_FALLBACK_SEED + station_id * 1009
+        )
+
+        min_x = RANDOM_FALLBACK_MARGIN_M
+        max_x = FIELD_WIDTH_M - RANDOM_FALLBACK_MARGIN_M
+        min_y = RANDOM_FALLBACK_MARGIN_M
+        max_y = FIELD_HEIGHT_M - RANDOM_FALLBACK_MARGIN_M
+
+        candidate = (FIELD_WIDTH_M / 2.0, FIELD_HEIGHT_M / 2.0)
+
+        for _ in range(100):
+            candidate = (
+                rng.uniform(min_x, max_x),
+                rng.uniform(min_y, max_y),
+            )
+
+            separated = all(
+                math.hypot(
+                    candidate[0] - other_x,
+                    candidate[1] - other_y,
+                ) >= RANDOM_FALLBACK_MIN_DISTANCE_M
+                for other_x, other_y
+                in fallback_station_positions.values()
+            )
+
+            if separated:
+                break
+
+        fallback_station_positions[station_id] = candidate
+        return candidate
+
+
+def forget_fallback_position(station_id: int) -> None:
+    """Удаляет запасную позицию, если реальные координаты стали корректными."""
+
+    with fallback_positions_lock:
+        fallback_station_positions.pop(station_id, None)
 
 
 # ============================================================
@@ -263,6 +332,15 @@ def receive_station():
 
     with data_lock:
         is_new = station_id not in detected_stations
+
+        if is_new and len(detected_stations) >= MAX_STATIONS:
+            station_count = len(detected_stations)
+            return jsonify({
+                "status": "ok",
+                "station_id": station_id,
+                "stations_count": station_count,
+            }), 200
+
         detected_stations[station_id] = station
         station_count = len(detected_stations)
 
@@ -323,7 +401,10 @@ def receive_pose():
 @app.route("/stations", methods=["GET"])
 def get_stations():
     with data_lock:
-        stations = [dict(item) for item in detected_stations.values()]
+        stations = [
+            dict(item)
+            for _, item in sorted(detected_stations.items())[:MAX_STATIONS]
+        ]
         pose = dict(current_pose)
         path = list(pose_path)
 
@@ -339,6 +420,8 @@ def get_stations():
 def clear_state():
     with data_lock:
         detected_stations.clear()
+        with fallback_positions_lock:
+            fallback_station_positions.clear()
         pose_path.clear()
         pose_path.append((0.0, 0.0))
         current_pose.update({
@@ -351,7 +434,7 @@ def clear_state():
             "flow_v": 0.0,
             "rotation_deg": 0.0,
             "total_distance": 0.0,
-            "coordinate_mode": "visual_odometry",
+            "coordinate_mode": "waypoint",
             "received_at": time.time(),
         })
 
@@ -585,7 +668,11 @@ def draw_pose_path(
     cv2.circle(frame, current_point, 12, POSE_COLOR, -1)
     cv2.circle(frame, current_point, 3, (255, 255, 255), -1)
 
-    odom_label = "ODOM OK" if pose.get("valid") else "ODOM WAIT"
+    mode = str(pose.get("coordinate_mode", "unknown"))
+    if mode == "waypoint":
+        odom_label = "WAYPOINT"
+    else:
+        odom_label = "ODOM OK" if pose.get("valid") else "ODOM WAIT"
     draw_text_with_background(
         frame,
         (
@@ -600,17 +687,34 @@ def draw_pose_path(
 def draw_station(frame: np.ndarray, station: dict) -> None:
     height, width = frame.shape[:2]
 
+    station_id = int(station["id"])
     x_local = float(station["x"])
     y_local = float(station["y"])
-    point = local_point_to_pixel(x_local, y_local, width, height)
 
-    if point is None:
-        x_map, y_map = drone_to_map_coordinates(x_local, y_local)
-        print(
-            f"[ПРЕДУПРЕЖДЕНИЕ] Станция №{station['id']} "
-            f"вне карты: map=({x_map:.2f}, {y_map:.2f})"
+    x_map, y_map = drone_to_map_coordinates(
+        x_local,
+        y_local,
+    )
+
+    fallback_used = not point_inside_field(
+        x_map,
+        y_map,
+    )
+
+    if fallback_used:
+        draw_x_map, draw_y_map = get_fallback_map_position(
+            station_id
         )
-        return
+    else:
+        draw_x_map, draw_y_map = x_map, y_map
+        forget_fallback_position(station_id)
+
+    point = map_meters_to_pixels(
+        draw_x_map,
+        draw_y_map,
+        width,
+        height,
+    )
 
     status = str(station.get("status", "обнаружена"))
     color = COLOR_MAP.get(status, UNKNOWN_COLOR)
@@ -636,7 +740,11 @@ def draw_station(frame: np.ndarray, station: dict) -> None:
         f"n={confirmations} dust={dust_votes} "
         f"clean={clean_votes}"
     )
-    fourth_line = f"mode={mode}"
+    fourth_line = (
+        "mode=random_fallback"
+        if fallback_used
+        else f"mode={mode}"
+    )
 
     label_x = point[0] + 18
     label_y = point[1] - 28
@@ -694,7 +802,7 @@ def build_map_frame(original_map: np.ndarray) -> np.ndarray:
     with data_lock:
         stations = [
             dict(station)
-            for station in detected_stations.values()
+            for _, station in sorted(detected_stations.items())[:MAX_STATIONS]
         ]
         pose = dict(current_pose)
         path = list(pose_path)
@@ -748,6 +856,8 @@ def display_loop() -> None:
         if key in (ord("c"), ord("C")):
             with data_lock:
                 detected_stations.clear()
+                with fallback_positions_lock:
+                    fallback_station_positions.clear()
                 pose_path.clear()
                 pose_path.append((0.0, 0.0))
                 current_pose.update({
@@ -760,7 +870,7 @@ def display_loop() -> None:
                     "flow_v": 0.0,
                     "rotation_deg": 0.0,
                     "total_distance": 0.0,
-                    "coordinate_mode": "visual_odometry",
+                    "coordinate_mode": "waypoint",
                     "received_at": time.time(),
                 })
 
@@ -798,7 +908,7 @@ def main() -> None:
         print("\nПрограмма остановлена")
     finally:
         stop_event.set()
-        cv2.destroyAllWindows() 
+        cv2.destroyAllWindows()
         print("Принимающая сторона остановлена")
 
 
