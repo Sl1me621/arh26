@@ -24,9 +24,10 @@ FIELD_HEIGHT_M = 6.0
 DRONE_START_MAP_X = 1.5
 DRONE_START_MAP_Y = 4.5
 
-MAP_IMAGE_PATH = Path(
-    r"C:\Users\1234\arh26\3_track\image.jpg"
-)
+BUNDLED_MAP_PATH = Path(__file__).with_name("map.jpg")
+MAP_IMAGE_PATH = Path(__file__).with_name("image.jpg")
+if not MAP_IMAGE_PATH.is_file():
+    MAP_IMAGE_PATH = BUNDLED_MAP_PATH
 
 WINDOW_NAME = "Geoscan Archipelag 2026 - Control Station"
 WINDOW_WIDTH = 1280
@@ -716,7 +717,11 @@ def build_map_frame(original_map: np.ndarray) -> np.ndarray:
 
 
 def display_loop() -> None:
-    original_map = cv2.imread(str(MAP_IMAGE_PATH))
+    flags = cv2.IMREAD_COLOR
+    if MAP_IMAGE_PATH == BUNDLED_MAP_PATH:
+        # Встроенный план поля 8 × 6 м записан горизонтально, EXIF поворачивает его.
+        flags |= cv2.IMREAD_IGNORE_ORIENTATION
+    original_map = cv2.imread(str(MAP_IMAGE_PATH), flags)
 
     if original_map is None:
         raise FileNotFoundError(
