@@ -1,0 +1,140 @@
+{
+  "red": {
+    "lower": [
+      179,
+      0,
+      0
+    ],
+    "upper": [
+      179,
+      0,
+      0
+    ],
+    "lower2": [
+      0,
+      255,
+      255
+    ],
+    "upper2": [
+      179,
+      255,
+      255
+    ],
+    "use_second_range": true
+  },
+  "blue": {
+    "lower": [
+      90,
+      70,
+      50
+    ],
+    "upper": [
+      130,
+      255,
+      255
+    ],
+    "lower2": [
+      0,
+      0,
+      0
+    ],
+    "upper2": [
+      0,
+      0,
+      0
+    ],
+    "use_second_range": false
+  },
+  "white": {
+    "lower": [
+      0,
+      0,
+      180
+    ],
+    "upper": [
+      179,
+      70,
+      255
+    ],
+    "lower2": [
+      0,
+      0,
+      0
+    ],
+    "upper2": [
+      0,
+      0,
+      0
+    ],
+    "use_second_range": false
+  },
+  "yellow": {
+    "lower": [
+      20,
+      80,
+      80
+    ],
+    "upper": [
+      38,
+      255,
+      255
+    ],
+    "lower2": [
+      0,
+      0,
+      0
+    ],
+    "upper2": [
+      0,
+      0,
+      0
+    ],
+    "use_second_range": false
+  },
+  "green": {
+    "lower": [
+      40,
+      60,
+      50
+    ],
+    "upper": [
+      85,
+      255,
+      255
+    ],
+    "lower2": [
+      0,
+      0,
+      0
+    ],
+    "upper2": [
+      0,
+      0,
+      0
+    ],
+    "use_second_range": false
+  },
+  "orange": {
+    "lower": [
+      0,
+      97,
+      0
+    ],
+    "upper": [
+      32,
+      255,
+      255
+    ],
+    "lower2": [
+      179,
+      57,
+      0
+    ],
+    "upper2": [
+      0,
+      0,
+      0
+    ],
+    "use_second_range": false
+  }
+}
